@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import samtools_lookup
 import argparse
 import math
@@ -14,16 +16,11 @@ parser = argparse.ArgumentParser(description = "Sliding window score of genome c
 
 parser.add_argument("-c", "--chunk_file", help = "Bed file containing coordinates of genomic chunks", required = True)
 parser.add_argument("-i", "--chunk_index", help = "Genomic chunk index", type = int, required = True)
-parser.add_argument("-w", "--window_size", help = "Size of sliding window (default: 10 bases", type = int, default = 10)
+parser.add_argument("-w", "--window_size", help = "Size of sliding window (default: 6 bases", type = int, default = 6)
 parser.add_argument("-o", "--output", help = "Output filename (Default: score_<index>.txt where <index> is the chunk index", default = "DEFAULT")
 parser.add_argument("-x", "--clean_mode", help = "Remove all temporary files", default = False, action = "store_true")
 
 args = parser.parse_args()
-
-if args.output == "DEFAULT":
-	outfile_name = "score_" + str(args.chunk_index) + ".txt"
-else:
-	outfile_name = args.output
 
 
 ### CHUNK RETREIVAL ###
@@ -40,6 +37,14 @@ start = chunk.strip().split()[1]
 end = chunk.strip().split()[2]
 
 seq = samtools_lookup.get_seq(chrom, start, end, name = None, zero = True).seq
+
+
+### OUTPUT FILENAME ###
+
+if args.output == "DEFAULT":
+	outfile_name = "score_" + chrom + "_" + str(args.chunk_index) + ".txt"
+else:
+	outfile_name = args.output
 
 
 ### TELO REF PREPARATION ###
@@ -73,17 +78,18 @@ with open("query_" + str(args.chunk_index) + ".fa", "w") as f:
 	starts = []
 	ends = []
 
-	while current_pos + (2*args.window_size) < len(seq):
-
-		starts.append(current_pos)
-		ends.append(current_pos + args.window_size)
+	while current_pos + (args.window_size) <= len(seq):
+		
+		genome_pos = int(start) + current_pos
+		starts.append(genome_pos)
+		ends.append(genome_pos + 1)
 		query = seq[current_pos:current_pos + args.window_size]
 		f.write(">" + str(current_pos) + "\n" + str(query) + "\n")
-		current_pos = current_pos + args.window_size
+		current_pos = current_pos + 1
 
 	# Output the last chunk of sequence
-	starts.append(current_pos)
-	ends.append(len(seq))
+	starts.append(int(start) + current_pos)
+	ends.append(int(end))
 	query = seq[current_pos:]
 	f.write(">" + str(current_pos) + "\n" + str(query) + "\n")
 
@@ -114,4 +120,5 @@ with open(outfile_name, "w") as f:
 ### CLEANUP ###
 
 if args.clean_mode:
-	os.remove(["telo_fwd_" + str(args.chunk_index) + ".txt", "telo_rev_" + str(args.chunk_index) + ".txt", "query_" + str(args.chunk_index) + ".fa"])
+	for tempfile in ["telo_fwd_" + str(args.chunk_index) + ".txt", "telo_rev_" + str(args.chunk_index) + ".txt", "query_" + str(args.chunk_index) + ".fa"]:
+		os.remove(tempfile)
